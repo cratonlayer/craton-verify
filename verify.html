@@ -202,7 +202,7 @@
     <p class="lead">
       Paste a retained receipt and a pinned JWKS key bundle. This page verifies
       <code>receipt.signature</code> over the decoded <code>receipt.payload_b64</code>
-      bytes exactly, then displays the signed payload.
+      bytes exactly, rejects unsupported protocol material, then displays the signed payload.
     </p>
 
     <section class="panel">
@@ -236,7 +236,8 @@
       <p>
         The verifier selects the public key whose <code>kid</code> matches the receipt,
         decodes <code>payload_b64</code>, and verifies the Ed25519 signature over those
-        exact bytes. It does not reserialize JSON and does not make network requests.
+        exact bytes. It rejects non-canonical or small-order Ed25519 points, does not
+        reserialize JSON, and does not make network requests.
       </p>
     </section>
   </main>
@@ -263,6 +264,7 @@
 
     const P = (1n << 255n) - 19n;
     const L = (1n << 252n) + 27742317777372353535851937790883648493n;
+    const IDENTITY = [0n, 1n];
     const mod = (value) => ((value % P) + P) % P;
     const pow = (base, exponent, modulo) => {
       let result = 1n;
@@ -318,11 +320,16 @@
       const sign = yBytes[31] >> 7;
       yBytes[31] &= 127;
       const y = bytesToBigIntLE(yBytes);
+      if (y >= P) throw new Error("point encoding is not canonical");
       let x = xrecover(y);
       if (Number(x & 1n) !== sign) x = P - x;
       const point = [x, y];
       if (!isOnCurve(point)) throw new Error("point is not on Ed25519 curve");
       return point;
+    }
+    function isSmallOrder(point) {
+      const multiplied = scalarMult(point, 8n);
+      return multiplied[0] === IDENTITY[0] && multiplied[1] === IDENTITY[1];
     }
     async function sha512(bytes) {
       const digest = await crypto.subtle.digest("SHA-512", bytes);
@@ -345,6 +352,7 @@
     function b64Decode(value) {
       let compact = String(value).replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/");
       compact += "=".repeat((4 - compact.length % 4) % 4);
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) throw new Error("invalid base64 encoding");
       const binary = atob(compact);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -366,7 +374,9 @@
       for (const key of jwks.keys || []) {
         if (key.kid === kid) {
           if (key.kty !== "OKP" || key.crv !== "Ed25519") throw new Error("matching key is not an Ed25519 OKP key");
-          return b64Decode(key.x);
+          const publicKey = b64Decode(key.x);
+          if (publicKey.length !== 32) throw new Error("matching key does not contain a 32-byte Ed25519 public key");
+          return publicKey;
         }
       }
       throw new Error("no JWKS key matches receipt.kid " + JSON.stringify(kid));
@@ -375,6 +385,7 @@
       if (signature.length !== 64 || publicKey.length !== 32) return false;
       const R = decodePoint(signature.slice(0, 32));
       const A = decodePoint(publicKey);
+      if (isSmallOrder(R) || isSmallOrder(A)) return false;
       const S = bytesToBigIntLE(signature.slice(32));
       if (S >= L) return false;
       const hBytes = await sha512(concatBytes([signature.slice(0, 32), publicKey, message]));
@@ -391,6 +402,8 @@
         const receiptDoc = JSON.parse(document.getElementById("receiptInput").value);
         const jwks = JSON.parse(document.getElementById("jwksInput").value);
         const receipt = extractReceipt(receiptDoc);
+        const sigAlg = String(receipt.sig_alg || "ed25519").toLowerCase();
+        if (sigAlg !== "ed25519") throw new Error("unsupported receipt signature algorithm " + JSON.stringify(receipt.sig_alg));
         const payloadBytes = b64Decode(receipt.payload_b64);
         const signature = b64Decode(receipt.signature);
         const publicKey = publicKeyForKid(jwks, receipt.kid);
@@ -398,10 +411,11 @@
         if (!ok) throw new Error("signature verification failed");
         const payloadText = new TextDecoder().decode(payloadBytes);
         const payload = JSON.parse(payloadText);
+        if (payload.protocol !== "craton.receipt.protocol.v1") throw new Error("verified payload is not craton.receipt.protocol.v1");
         const report = {
           verified: true,
           kid: receipt.kid,
-          sig_alg: receipt.sig_alg || "ed25519",
+          sig_alg: "ed25519",
           payload_sha256: await sha256Hex(payloadBytes),
           protocol: payload.protocol,
           commitment_id: payload.commitment_id,

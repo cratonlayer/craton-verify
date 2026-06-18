@@ -18,6 +18,7 @@ from typing import Any
 
 P = 2**255 - 19
 L = 2**252 + 27742317777372353535851937790883648493
+IDENTITY = (0, 1)
 
 
 def _inv(value: int) -> int:
@@ -70,6 +71,8 @@ def _decode_point(encoded: bytes) -> tuple[int, int]:
     if len(encoded) != 32:
         raise ValueError("Ed25519 public keys and R values must be 32 bytes")
     y = int.from_bytes(encoded, "little") & ((1 << 255) - 1)
+    if y >= P:
+        raise ValueError("point encoding is not canonical")
     x = _xrecover(y)
     if (x & 1) != (encoded[31] >> 7):
         x = P - x
@@ -79,6 +82,10 @@ def _decode_point(encoded: bytes) -> tuple[int, int]:
     return point
 
 
+def _is_small_order(point: tuple[int, int]) -> bool:
+    return _scalar_mult(point, 8) == IDENTITY
+
+
 def verify_ed25519(signature: bytes, message: bytes, public_key: bytes) -> bool:
     if len(signature) != 64 or len(public_key) != 32:
         return False
@@ -86,6 +93,8 @@ def verify_ed25519(signature: bytes, message: bytes, public_key: bytes) -> bool:
         r_point = _decode_point(signature[:32])
         public_point = _decode_point(public_key)
     except ValueError:
+        return False
+    if _is_small_order(r_point) or _is_small_order(public_point):
         return False
     s_value = int.from_bytes(signature[32:], "little")
     if s_value >= L:
@@ -98,12 +107,9 @@ def verify_ed25519(signature: bytes, message: bytes, public_key: bytes) -> bool:
 
 
 def b64_decode(value: str) -> bytes:
-    compact = "".join(str(value).split())
+    compact = "".join(str(value).split()).replace("-", "+").replace("_", "/")
     compact += "=" * ((4 - len(compact) % 4) % 4)
-    try:
-        return base64.b64decode(compact, validate=True)
-    except Exception:
-        return base64.urlsafe_b64decode(compact)
+    return base64.b64decode(compact, validate=True)
 
 
 def extract_receipt(document: Any) -> dict[str, Any]:
@@ -126,7 +132,10 @@ def select_public_key(jwks: dict[str, Any], kid: str) -> bytes:
         if key.get("kid") == kid:
             if key.get("kty") != "OKP" or key.get("crv") != "Ed25519":
                 raise ValueError(f"key {kid!r} is not an Ed25519 OKP key")
-            return b64_decode(key["x"])
+            public_key = b64_decode(key["x"])
+            if len(public_key) != 32:
+                raise ValueError(f"key {kid!r} does not contain a 32-byte Ed25519 public key")
+            return public_key
     raise ValueError(f"no JWKS key matches receipt.kid {kid!r}")
 
 
@@ -137,6 +146,9 @@ def verify_receipt(receipt_document: Any, jwks_document: dict[str, Any]) -> dict
     kid = receipt.get("kid")
     if not payload_b64 or not signature_b64 or not kid:
         raise ValueError("receipt must include payload_b64, signature, and kid")
+    sig_alg = str(receipt.get("sig_alg", "ed25519")).lower()
+    if sig_alg != "ed25519":
+        raise ValueError(f"unsupported receipt signature algorithm {receipt.get('sig_alg')!r}")
 
     payload_bytes = b64_decode(payload_b64)
     signature = b64_decode(signature_b64)
@@ -149,11 +161,13 @@ def verify_receipt(receipt_document: Any, jwks_document: dict[str, Any]) -> dict
         signed_payload = json.loads(payload_bytes.decode("utf-8"))
     except Exception as exc:
         raise ValueError(f"verified payload is not valid UTF-8 JSON: {exc}") from exc
+    if signed_payload.get("protocol") != "craton.receipt.protocol.v1":
+        raise ValueError("verified payload is not craton.receipt.protocol.v1")
 
     return {
         "verified": True,
         "kid": kid,
-        "sig_alg": receipt.get("sig_alg", "ed25519"),
+        "sig_alg": "ed25519",
         "payload_sha256": hashlib.sha256(payload_bytes).hexdigest(),
         "protocol": signed_payload.get("protocol"),
         "commitment_id": signed_payload.get("commitment_id"),
