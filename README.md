@@ -1,5 +1,9 @@
 # Craton Offline Receipt Verifier
 
+- **Status:** public verification kit for `craton.receipt.protocol.v1`
+- **Runtime:** no network calls, no package install, no Craton account required
+- **Use case:** retained receipt + pinned JWKS bundle -> independent local verification
+
 Craton receipts are designed to remain independently verifiable even if the Craton runtime is unavailable. This kit verifies a stored receipt locally with a pinned public key bundle. It does not call Craton, does not require a network connection, and does not send receipt data anywhere.
 
 The verifier implements `craton.receipt.protocol.v1` only. It verifies the Ed25519 signature over the exact decoded `receipt.payload_b64` bytes before it parses or displays the signed payload.
@@ -51,6 +55,10 @@ On success, the script prints a JSON report with `verified: true`, the selected 
 - The verifier rejects unsupported signature algorithms, non-canonical Ed25519 point encodings, small-order Ed25519 points, and payloads that are not `craton.receipt.protocol.v1`.
 - Signature verification is performed before payload parsing. Do not reserialize the payload JSON and verify a transformed representation.
 - This repository intentionally contains no production private keys, API keys, customer data, runtime configuration, or Craton server code.
+
+## Repository Scope
+
+This repository is intentionally narrow. It contains only the standalone offline verifier, a sample receipt fixture, and a sample public key fixture. It does not contain the Craton runtime, production signing keys, customer configuration, billing logic, or deployment configuration.
 
 ## Verification Logic
 
