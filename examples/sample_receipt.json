@@ -1,0 +1,8 @@
+{
+  "receipt": {
+    "payload_b64": "eyJib3VuZGFyeV9zbmFwc2hvdCI6eyJkZWNpc2lvbl90eXBlIjoidGhyZXNob2xkX2V4ZWN1dGlvbl9yZXF1ZXN0IiwiZ2F0ZV90eXBlIjoidGhyZXNob2xkX2dhdGUiLCJzeXN0ZW1fc2NvcGUiOiJlcnBfcGF5bWVudF9yZWxlYXNlX3dvcmtmbG93In0sImNvbW1pdG1lbnRfaWQiOiJibmRfc2FtcGxlX29mZmxpbmVfMDAxIiwiaXNzdWVkX2F0IjoiMjAyNi0wNi0xN1QwMDowMDowMFoiLCJub3RlIjoiU2FtcGxlIHJlY2VpcHQgZm9yIHRoZSBvZmZsaW5lIHZlcmlmaWVyIGtpdC4gRG8gbm90IHVzZSB0aGlzIGtleSBmb3IgcHJvZHVjdGlvbiByZWNlaXB0cy4iLCJwcm90b2NvbCI6ImNyYXRvbi5yZWNlaXB0LnByb3RvY29sLnYxIiwicmVxdWVzdF9pZCI6InJlcV9zYW1wbGVfb2ZmbGluZV8wMDEiLCJ2ZXJkaWN0IjoiYWxsb3cifQ==",
+    "signature": "L78Nk6vn7SIVRlgERW2c1sjLYiQ8hkSE6pTlP/VxggkmLfnU6BZKlJIsZl8gjvmSFkb+q1RRHdNHT01VV1esCQ==",
+    "kid": "sample-k1",
+    "sig_alg": "ed25519"
+  }
+}

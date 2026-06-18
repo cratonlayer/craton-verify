@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Craton Offline Receipt Verifier</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #d8e1ec;
+      --blue: #1d4ed8;
+      --soft: #eef4ff;
+      --good: #047857;
+      --bad: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: rgba(248, 250, 252, 0.94);
+    }
+    .nav {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 26px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      letter-spacing: 0.36em;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .mark {
+      width: 27px;
+      height: 21px;
+      position: relative;
+      display: inline-block;
+    }
+    .mark::before,
+    .mark::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      width: 27px;
+      height: 10px;
+      border: 3px solid #0f172a;
+      border-top: 0;
+      transform: skewY(-25deg);
+    }
+    .mark::before { top: 0; border-color: #cfe0f4; }
+    .mark::after { top: 7px; }
+    main {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 70px 28px 96px;
+    }
+    .eyebrow {
+      color: #8a98ad;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.38em;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+    h1 {
+      max-width: 860px;
+      font-size: clamp(40px, 6vw, 68px);
+      line-height: 0.96;
+      letter-spacing: 0;
+      margin: 0 0 24px;
+    }
+    .lead {
+      max-width: 840px;
+      color: #334155;
+      font-size: 20px;
+      margin: 0 0 44px;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 30px;
+      margin: 24px 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+    }
+    label {
+      display: block;
+      font-size: 16px;
+      font-weight: 800;
+      color: #334155;
+      margin-bottom: 10px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 300px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: #fbfdff;
+      color: var(--ink);
+      font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+      margin-top: 22px;
+    }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 800;
+      padding: 13px 18px;
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: #fff;
+    }
+    .note {
+      color: var(--muted);
+      font-size: 15px;
+      margin: 14px 0 0;
+    }
+    .result {
+      white-space: pre-wrap;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfdff;
+      padding: 20px;
+      min-height: 120px;
+      font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .status.good { color: var(--good); background: #ecfdf5; border: 1px solid #bbf7d0; }
+    .status.bad { color: var(--bad); background: #fef2f2; border: 1px solid #fecaca; }
+    code {
+      border: 1px solid #cfdbef;
+      border-radius: 6px;
+      background: var(--soft);
+      color: #1e3a8a;
+      padding: 1px 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (max-width: 760px) {
+      .nav { padding: 22px 20px; }
+      main { padding: 48px 20px 72px; }
+      .brand { font-size: 16px; gap: 12px; }
+      .grid { grid-template-columns: 1fr; }
+      .panel { padding: 22px; }
+      .lead { font-size: 18px; }
+      textarea { min-height: 240px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="nav">
+      <div class="brand"><span class="mark" aria-hidden="true"></span><span>CRATON</span></div>
+      <div class="note">Offline verifier</div>
+    </div>
+  </header>
+  <main>
+    <div class="eyebrow">craton.receipt.protocol.v1</div>
+    <h1>Verify a Craton receipt without calling Craton.</h1>
+    <p class="lead">
+      Paste a retained receipt and a pinned JWKS key bundle. This page verifies
+      <code>receipt.signature</code> over the decoded <code>receipt.payload_b64</code>
+      bytes exactly, then displays the signed payload.
+    </p>
+
+    <section class="panel">
+      <div class="grid">
+        <div>
+          <label for="receiptInput">Receipt JSON</label>
+          <textarea id="receiptInput" spellcheck="false"></textarea>
+          <p class="note">Paste a receipt, <code>{"receipt": ...}</code>, or a full boundary response.</p>
+        </div>
+        <div>
+          <label for="jwksInput">Pinned public JWKS</label>
+          <textarea id="jwksInput" spellcheck="false"></textarea>
+          <p class="note">For production receipts, use the JWKS you retained from <code>/protocol/v1/jwks.json</code>.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="verifyButton">Verify receipt</button>
+        <button type="button" id="sampleButton">Load sample</button>
+        <button type="button" id="clearButton">Clear</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <label>Verification result</label>
+      <div id="status"></div>
+      <div class="result" id="result">No receipt verified yet.</div>
+    </section>
+
+    <section class="panel">
+      <label>What this page checks</label>
+      <p>
+        The verifier selects the public key whose <code>kid</code> matches the receipt,
+        decodes <code>payload_b64</code>, and verifies the Ed25519 signature over those
+        exact bytes. It does not reserialize JSON and does not make network requests.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    const SAMPLE_RECEIPT = {
+      "receipt": {
+        "payload_b64": "eyJib3VuZGFyeV9zbmFwc2hvdCI6eyJkZWNpc2lvbl90eXBlIjoidGhyZXNob2xkX2V4ZWN1dGlvbl9yZXF1ZXN0IiwiZ2F0ZV90eXBlIjoidGhyZXNob2xkX2dhdGUiLCJzeXN0ZW1fc2NvcGUiOiJlcnBfcGF5bWVudF9yZWxlYXNlX3dvcmtmbG93In0sImNvbW1pdG1lbnRfaWQiOiJibmRfc2FtcGxlX29mZmxpbmVfMDAxIiwiaXNzdWVkX2F0IjoiMjAyNi0wNi0xN1QwMDowMDowMFoiLCJub3RlIjoiU2FtcGxlIHJlY2VpcHQgZm9yIHRoZSBvZmZsaW5lIHZlcmlmaWVyIGtpdC4gRG8gbm90IHVzZSB0aGlzIGtleSBmb3IgcHJvZHVjdGlvbiByZWNlaXB0cy4iLCJwcm90b2NvbCI6ImNyYXRvbi5yZWNlaXB0LnByb3RvY29sLnYxIiwicmVxdWVzdF9pZCI6InJlcV9zYW1wbGVfb2ZmbGluZV8wMDEiLCJ2ZXJkaWN0IjoiYWxsb3cifQ==",
+        "signature": "L78Nk6vn7SIVRlgERW2c1sjLYiQ8hkSE6pTlP/VxggkmLfnU6BZKlJIsZl8gjvmSFkb+q1RRHdNHT01VV1esCQ==",
+        "kid": "sample-k1",
+        "sig_alg": "ed25519"
+      }
+    };
+    const SAMPLE_JWKS = {
+      "keys": [{
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "alg": "EdDSA",
+        "use": "sig",
+        "kid": "sample-k1",
+        "x": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg"
+      }]
+    };
+
+    const P = (1n << 255n) - 19n;
+    const L = (1n << 252n) + 27742317777372353535851937790883648493n;
+    const mod = (value) => ((value % P) + P) % P;
+    const pow = (base, exponent, modulo) => {
+      let result = 1n;
+      base = mod(base);
+      while (exponent > 0n) {
+        if (exponent & 1n) result = (result * base) % modulo;
+        base = (base * base) % modulo;
+        exponent >>= 1n;
+      }
+      return result;
+    };
+    const inv = (value) => pow(value, P - 2n, P);
+    const D = mod(-121665n * inv(121666n));
+    const I = pow(2n, (P - 1n) / 4n, P);
+    const BY = mod(4n * inv(5n));
+    function xrecover(y) {
+      const xx = mod((y * y - 1n) * inv(D * y * y + 1n));
+      let x = pow(xx, (P + 3n) / 8n, P);
+      if (mod(x * x - xx) !== 0n) x = mod(x * I);
+      if (x & 1n) x = P - x;
+      return x;
+    }
+    const B = [xrecover(BY), BY];
+    function isOnCurve(point) {
+      const [x, y] = point;
+      return mod(-x * x + y * y - 1n - D * x * x * y * y) === 0n;
+    }
+    function edwards(a, b) {
+      const [x1, y1] = a;
+      const [x2, y2] = b;
+      return [
+        mod((x1 * y2 + x2 * y1) * inv(1n + D * x1 * x2 * y1 * y2)),
+        mod((y1 * y2 + x1 * x2) * inv(1n - D * x1 * x2 * y1 * y2))
+      ];
+    }
+    function scalarMult(point, scalar) {
+      let result = [0n, 1n];
+      while (scalar > 0n) {
+        if (scalar & 1n) result = edwards(result, point);
+        point = edwards(point, point);
+        scalar >>= 1n;
+      }
+      return result;
+    }
+    function bytesToBigIntLE(bytes) {
+      let result = 0n;
+      for (let i = bytes.length - 1; i >= 0; i--) result = (result << 8n) + BigInt(bytes[i]);
+      return result;
+    }
+    function decodePoint(bytes) {
+      if (bytes.length !== 32) throw new Error("Ed25519 public keys and R values must be 32 bytes");
+      const yBytes = new Uint8Array(bytes);
+      const sign = yBytes[31] >> 7;
+      yBytes[31] &= 127;
+      const y = bytesToBigIntLE(yBytes);
+      let x = xrecover(y);
+      if (Number(x & 1n) !== sign) x = P - x;
+      const point = [x, y];
+      if (!isOnCurve(point)) throw new Error("point is not on Ed25519 curve");
+      return point;
+    }
+    async function sha512(bytes) {
+      const digest = await crypto.subtle.digest("SHA-512", bytes);
+      return new Uint8Array(digest);
+    }
+    async function sha256Hex(bytes) {
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+    function concatBytes(parts) {
+      const length = parts.reduce((sum, part) => sum + part.length, 0);
+      const out = new Uint8Array(length);
+      let offset = 0;
+      for (const part of parts) {
+        out.set(part, offset);
+        offset += part.length;
+      }
+      return out;
+    }
+    function b64Decode(value) {
+      let compact = String(value).replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/");
+      compact += "=".repeat((4 - compact.length % 4) % 4);
+      const binary = atob(compact);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+    function extractReceipt(doc) {
+      if (doc && typeof doc === "object") {
+        if (doc.receipt && typeof doc.receipt === "object") return doc.receipt;
+        if (doc.payload_b64 && doc.signature && doc.kid) return doc;
+        for (const value of Object.values(doc)) {
+          if (value && typeof value === "object") {
+            try { return extractReceipt(value); } catch (_err) {}
+          }
+        }
+      }
+      throw new Error("receipt object not found");
+    }
+    function publicKeyForKid(jwks, kid) {
+      for (const key of jwks.keys || []) {
+        if (key.kid === kid) {
+          if (key.kty !== "OKP" || key.crv !== "Ed25519") throw new Error("matching key is not an Ed25519 OKP key");
+          return b64Decode(key.x);
+        }
+      }
+      throw new Error("no JWKS key matches receipt.kid " + JSON.stringify(kid));
+    }
+    async function verifyEd25519(signature, message, publicKey) {
+      if (signature.length !== 64 || publicKey.length !== 32) return false;
+      const R = decodePoint(signature.slice(0, 32));
+      const A = decodePoint(publicKey);
+      const S = bytesToBigIntLE(signature.slice(32));
+      if (S >= L) return false;
+      const hBytes = await sha512(concatBytes([signature.slice(0, 32), publicKey, message]));
+      const h = bytesToBigIntLE(hBytes) % L;
+      const left = scalarMult(B, S);
+      const right = edwards(R, scalarMult(A, h));
+      return left[0] === right[0] && left[1] === right[1];
+    }
+    async function verify() {
+      const result = document.getElementById("result");
+      const status = document.getElementById("status");
+      status.textContent = "";
+      try {
+        const receiptDoc = JSON.parse(document.getElementById("receiptInput").value);
+        const jwks = JSON.parse(document.getElementById("jwksInput").value);
+        const receipt = extractReceipt(receiptDoc);
+        const payloadBytes = b64Decode(receipt.payload_b64);
+        const signature = b64Decode(receipt.signature);
+        const publicKey = publicKeyForKid(jwks, receipt.kid);
+        const ok = await verifyEd25519(signature, payloadBytes, publicKey);
+        if (!ok) throw new Error("signature verification failed");
+        const payloadText = new TextDecoder().decode(payloadBytes);
+        const payload = JSON.parse(payloadText);
+        const report = {
+          verified: true,
+          kid: receipt.kid,
+          sig_alg: receipt.sig_alg || "ed25519",
+          payload_sha256: await sha256Hex(payloadBytes),
+          protocol: payload.protocol,
+          commitment_id: payload.commitment_id,
+          request_id: payload.request_id,
+          verdict: payload.verdict,
+          signed_payload: payload
+        };
+        status.innerHTML = "";
+        const pill = document.createElement("span");
+        pill.className = "status good";
+        pill.textContent = "Verified";
+        status.appendChild(pill);
+        result.textContent = JSON.stringify(report, null, 2);
+      } catch (err) {
+        status.innerHTML = "";
+        const pill = document.createElement("span");
+        pill.className = "status bad";
+        pill.textContent = "Not verified";
+        status.appendChild(pill);
+        result.textContent = JSON.stringify({ verified: false, reason: String(err.message || err) }, null, 2);
+      }
+    }
+    function loadSample() {
+      document.getElementById("receiptInput").value = JSON.stringify(SAMPLE_RECEIPT, null, 2);
+      document.getElementById("jwksInput").value = JSON.stringify(SAMPLE_JWKS, null, 2);
+      document.getElementById("status").textContent = "";
+      document.getElementById("result").textContent = "Sample loaded. Select Verify receipt.";
+    }
+    document.getElementById("verifyButton").addEventListener("click", verify);
+    document.getElementById("sampleButton").addEventListener("click", loadSample);
+    document.getElementById("clearButton").addEventListener("click", () => {
+      document.getElementById("receiptInput").value = "";
+      document.getElementById("jwksInput").value = "";
+      document.getElementById("status").textContent = "";
+      document.getElementById("result").textContent = "No receipt verified yet.";
+    });
+    loadSample();
+  </script>
+</body>
+</html>
