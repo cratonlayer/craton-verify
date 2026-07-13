@@ -419,7 +419,12 @@
         const payload = JSON.parse(payloadText);
         if (payload.protocol !== "craton.receipt.protocol.v1") throw new Error("verified payload is not craton.receipt.protocol.v1");
         const report = {
-          verified: true,
+          verified: false,
+          signature_valid: true,
+          verification_scope: "signature_matches_supplied_key",
+          issuer_identity_verified: false,
+          trust_anchor: "missing_attestation_legacy_browser_input",
+          trust_boundary: "This two-field browser verifier confirms the receipt signature matches the public key supplied in the JWKS field. Use verify.py with a full verification bundle to verify a root-signed Craton operational-key attestation.",
           kid: receipt.kid,
           sig_alg: "ed25519",
           payload_sha256: await sha256Hex(payloadBytes),
@@ -432,7 +437,7 @@
         status.innerHTML = "";
         const pill = document.createElement("span");
         pill.className = "status good";
-        pill.textContent = "Verified";
+        pill.textContent = "Signature valid / issuer unanchored";
         status.appendChild(pill);
         result.textContent = JSON.stringify(report, null, 2);
       } catch (err) {
