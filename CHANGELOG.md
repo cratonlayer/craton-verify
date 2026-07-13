@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.0
+
+- Added single-file Craton verification bundle input for `verify.py`.
+- Kept legacy `receipt.json --jwks pinned-public-key.jwks.json` mode for compatibility.
+- Added support for Craton public key bundle entries that wrap public JWK material.
+
 ## v0.1.0
 
 Initial public verifier kit for `craton.receipt.protocol.v1`.

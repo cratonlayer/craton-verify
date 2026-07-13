@@ -200,9 +200,15 @@
     <div class="eyebrow">craton.receipt.protocol.v1</div>
     <h1>Verify a Craton receipt without calling Craton.</h1>
     <p class="lead">
-      Paste a retained receipt and a pinned JWKS key bundle. This page verifies
-      <code>receipt.signature</code> over the decoded <code>receipt.payload_b64</code>
+      Paste a retained receipt and a pinned JWKS key bundle. This browser page is a
+      two-field verifier; it does not automatically parse a single verification bundle JSON file.
+      It verifies <code>receipt.signature</code> over the decoded <code>receipt.payload_b64</code>
       bytes exactly, rejects unsupported protocol material, then displays the signed payload.
+    </p>
+    <p class="note">
+      If your retained file is a Craton verification bundle, use <code>python verify.py path/to/craton_verification_bundle.json</code>
+      for single-file verification. To use this page manually, paste <code>bundle.receipt</code> into the receipt field
+      and a JWKS document containing the matching public JWK into the JWKS field.
     </p>
 
     <section class="panel">
@@ -210,12 +216,12 @@
         <div>
           <label for="receiptInput">Receipt JSON</label>
           <textarea id="receiptInput" spellcheck="false"></textarea>
-          <p class="note">Paste a receipt, <code>{"receipt": ...}</code>, or a full boundary response.</p>
+          <p class="note">Paste a receipt, <code>{"receipt": ...}</code>, a full boundary response, or <code>bundle.receipt</code> from a verification bundle.</p>
         </div>
         <div>
           <label for="jwksInput">Pinned public JWKS</label>
           <textarea id="jwksInput" spellcheck="false"></textarea>
-          <p class="note">For production receipts, use the JWKS you retained from <code>/protocol/v1/jwks.json</code>.</p>
+          <p class="note">For production receipts, use the retained JWKS. If you start from a verification bundle, provide a JWKS document containing the matching public JWK; the page does not parse the bundle wrapper automatically.</p>
         </div>
       </div>
       <div class="actions">

@@ -130,17 +130,34 @@ def extract_receipt(document: Any) -> dict[str, Any]:
 def select_public_key(jwks: dict[str, Any], kid: str) -> bytes:
     for key in jwks.get("keys", []):
         if key.get("kid") == kid:
-            if key.get("kty") != "OKP" or key.get("crv") != "Ed25519":
-                raise ValueError(f"key {kid!r} is not an Ed25519 OKP key")
-            public_key = b64_decode(key["x"])
+            jwk = key.get("public_key_jwk") if isinstance(key.get("public_key_jwk"), dict) else key
+            public_key_b64 = key.get("public_key_b64")
+            if public_key_b64:
+                public_key = b64_decode(public_key_b64)
+            else:
+                if jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519":
+                    raise ValueError(f"key {kid!r} is not an Ed25519 OKP key")
+                public_key = b64_decode(jwk["x"])
             if len(public_key) != 32:
                 raise ValueError(f"key {kid!r} does not contain a 32-byte Ed25519 public key")
             return public_key
-    raise ValueError(f"no JWKS key matches receipt.kid {kid!r}")
+    raise ValueError(f"no key bundle entry matches receipt.kid {kid!r}")
 
 
-def verify_receipt(receipt_document: Any, jwks_document: dict[str, Any]) -> dict[str, Any]:
-    receipt = extract_receipt(receipt_document)
+def resolve_verification_inputs(receipt_document: Any, jwks_document: dict[str, Any] | None = None) -> tuple[dict[str, Any], dict[str, Any], str]:
+    if isinstance(receipt_document, dict) and receipt_document.get("object") == "craton.receipt.verification_bundle":
+        receipt = receipt_document.get("receipt")
+        key_bundle = receipt_document.get("key_bundle")
+        if not isinstance(receipt, dict) or not isinstance(key_bundle, dict):
+            raise ValueError("verification bundle must include receipt and key_bundle objects")
+        return receipt, key_bundle, "verification_bundle"
+    if jwks_document is None:
+        raise ValueError("non-bundle receipt input requires --jwks with the pinned public key bundle")
+    return extract_receipt(receipt_document), jwks_document, "jwks_argument"
+
+
+def verify_receipt(receipt_document: Any, jwks_document: dict[str, Any] | None = None) -> dict[str, Any]:
+    receipt, key_document, key_source = resolve_verification_inputs(receipt_document, jwks_document)
     payload_b64 = receipt.get("payload_b64")
     signature_b64 = receipt.get("signature")
     kid = receipt.get("kid")
@@ -152,7 +169,7 @@ def verify_receipt(receipt_document: Any, jwks_document: dict[str, Any]) -> dict
 
     payload_bytes = b64_decode(payload_b64)
     signature = b64_decode(signature_b64)
-    public_key = select_public_key(jwks_document, str(kid))
+    public_key = select_public_key(key_document, str(kid))
 
     if not verify_ed25519(signature, payload_bytes, public_key):
         raise ValueError("signature verification failed")
@@ -169,6 +186,7 @@ def verify_receipt(receipt_document: Any, jwks_document: dict[str, Any]) -> dict
         "kid": kid,
         "sig_alg": "ed25519",
         "payload_sha256": hashlib.sha256(payload_bytes).hexdigest(),
+        "key_source": key_source,
         "protocol": signed_payload.get("protocol"),
         "commitment_id": signed_payload.get("commitment_id"),
         "request_id": signed_payload.get("request_id"),
@@ -183,12 +201,13 @@ def load_json(path: str) -> Any:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Verify a Craton receipt offline.")
-    parser.add_argument("receipt", help="Path to receipt JSON or full boundary response JSON")
-    parser.add_argument("--jwks", required=True, help="Path to pinned JWKS public key bundle")
+    parser.add_argument("receipt", help="Path to verification bundle, receipt JSON, or full boundary response JSON")
+    parser.add_argument("--jwks", help="Path to pinned JWKS public key bundle for legacy two-file verification")
     args = parser.parse_args(argv)
 
     try:
-        report = verify_receipt(load_json(args.receipt), load_json(args.jwks))
+        jwks_document = load_json(args.jwks) if args.jwks else None
+        report = verify_receipt(load_json(args.receipt), jwks_document)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
     except Exception as exc:
