@@ -49,7 +49,7 @@ The command-line verifier pins the Craton root public key fingerprint:
 craton-root-v1 / 43a88132f76a9201b0773f245381329922754eed1a668d386be653b5549cfe80
 ```
 
-For an anchored verification bundle, the verifier first validates the root-signed operational-key attestation. Only after that does it verify the receipt signature with the attested operational key. A forged bundle that contains a fake receipt and an attacker-generated public key cannot produce `issuer_identity_verified: true` unless it also contains a valid Craton root-signed attestation for that key.
+For an anchored verification bundle, the verifier first verifies the receipt signature with the selected operational key. Only after the signed payload is verified does it validate the root-signed operational-key attestation and check that the receipt's self-reported `issued_at` falls inside the attestation validity window. The signed payload makes that claimed `issued_at` tamper-evident, but it is not an external timestamp authority or independent proof of physical signing time. A forged bundle that contains a fake receipt and an attacker-generated public key cannot produce `issuer_identity_verified: true` unless it also contains a valid Craton root-signed attestation for that key.
 
 Legacy receipts or bundles without an attestation are still checked for signature consistency. They return `signature_valid: true` when the receipt signature matches the supplied key, but they return `issuer_identity_verified: false` and `trust_anchor: "missing_attestation_legacy_bundle"`. That legacy result means the receipt and supplied key are internally consistent; it does not prove the key was issued by Craton.
 

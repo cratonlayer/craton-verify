@@ -207,7 +207,17 @@ def invalid_attestation_report(reason: str) -> dict[str, Any]:
     }
 
 
-def verify_operational_key_attestation(attestation: dict[str, Any] | None, kid: str, operational_public_key: bytes) -> dict[str, Any]:
+def claimed_receipt_issued_at(signed_payload: dict[str, Any]) -> datetime:
+    return parse_timestamp(str(signed_payload.get("issued_at") or ""))
+
+
+def verify_operational_key_attestation(
+    attestation: dict[str, Any] | None,
+    kid: str,
+    operational_public_key: bytes,
+    receipt_claimed_issued_at: datetime | None = None,
+    receipt_claimed_issued_at_raw: str = "",
+) -> dict[str, Any]:
     if not attestation:
         return missing_attestation_report()
     try:
@@ -249,20 +259,25 @@ def verify_operational_key_attestation(attestation: dict[str, Any] | None, kid: 
             return invalid_attestation_report("subject_public_key_mismatch")
         if subject.get("public_key_fingerprint_sha256") != sha256_hex(operational_public_key):
             return invalid_attestation_report("subject_public_key_fingerprint_mismatch")
-        now = datetime.now(timezone.utc)
+        if receipt_claimed_issued_at is None:
+            return invalid_attestation_report("missing_receipt_claimed_issued_at")
         not_before = parse_timestamp(payload.get("not_before") or payload.get("issued_at"))
         not_after = parse_timestamp(payload.get("not_after"))
-        if now < not_before:
+        if receipt_claimed_issued_at < not_before:
             return invalid_attestation_report("attestation_not_yet_valid")
-        if now > not_after:
+        if receipt_claimed_issued_at > not_after:
             return invalid_attestation_report("attestation_expired")
         return {
             "issuer_identity_verified": True,
             "trust_anchor": root_key_id,
             "attestation_status": "verified",
+            "attestation_time_basis": "receipt_claimed_issued_at",
+            "receipt_claimed_issued_at": receipt_claimed_issued_at_raw,
+            "receipt_claimed_issued_at_notice": "The attestation validity window is evaluated against the issued_at value inside the verified receipt payload. This timestamp is self-reported by the receipt issuer; it is not an external timestamp authority or independent proof of physical signing time.",
             "attestation_payload_sha256": sha256_hex(payload_bytes),
             "root_public_key_fingerprint_sha256": anchor["public_key_fingerprint_sha256"],
             "operational_key_fingerprint_sha256": sha256_hex(operational_public_key),
+            "attestation_not_before": payload.get("not_before") or payload.get("issued_at"),
             "attestation_not_after": payload.get("not_after"),
             "trust_boundary": "Receipt signature is valid and the operational signing key is covered by a root-signed Craton attestation pinned by this verifier.",
         }
@@ -307,7 +322,21 @@ def verify_receipt(receipt_document: Any, jwks_document: dict[str, Any] | None =
     if signed_payload.get("protocol") != RECEIPT_PROTOCOL:
         raise ValueError("verified payload is not craton.receipt.protocol.v1")
 
-    attestation_report = verify_operational_key_attestation(attestation, str(kid), public_key)
+    receipt_issued_at_raw = str(signed_payload.get("issued_at") or "").strip()
+    receipt_issued_at = None
+    if attestation:
+        try:
+            receipt_issued_at = claimed_receipt_issued_at(signed_payload)
+        except Exception as exc:
+            raise ValueError(f"verified payload is missing a valid self-reported issued_at timestamp: {exc}") from exc
+
+    attestation_report = verify_operational_key_attestation(
+        attestation,
+        str(kid),
+        public_key,
+        receipt_issued_at,
+        receipt_issued_at_raw,
+    )
     issuer_identity_verified = bool(attestation_report.get("issuer_identity_verified"))
 
     return {
