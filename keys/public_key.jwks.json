@@ -1,12 +1,13 @@
 {
+  "_fixture_notice": "Test-only public verification key. Not production material.",
   "keys": [
     {
       "kty": "OKP",
       "crv": "Ed25519",
       "alg": "EdDSA",
       "use": "sig",
-      "kid": "sample-k1",
-      "x": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg"
+      "kid": "fixture-key",
+      "x": "11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg"
     }
   ]
 }

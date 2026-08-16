@@ -197,31 +197,28 @@
     </div>
   </header>
   <main>
-    <div class="eyebrow">craton.receipt.protocol.v1</div>
-    <h1>Verify a Craton receipt without calling Craton.</h1>
+    <div class="eyebrow">Offline verification</div>
+    <h1>Verify a retained CRATON signed boundary record locally.</h1>
     <p class="lead">
-      Paste a retained receipt and a pinned JWKS key bundle. This browser page is a
-      two-field verifier; it does not automatically parse a single verification bundle JSON file.
-      It verifies <code>receipt.signature</code> over the decoded <code>receipt.payload_b64</code>
-      bytes exactly, rejects unsupported protocol material, then displays the signed payload.
+      This standalone browser page checks signature integrity against retained public
+      verification key material. It makes no network request and sends no record data anywhere.
     </p>
     <p class="note">
-      If your retained file is a Craton verification bundle, use <code>python verify.py path/to/craton_verification_bundle.json</code>
-      for single-file verification. To use this page manually, paste <code>bundle.receipt</code> into the receipt field
-      and a JWKS document containing the matching public JWK into the JWKS field.
+      This page performs the legacy two-input check and does not establish issuer identity.
+      Use <code>verify.py</code> with a current retained verification bundle when issuer/key binding is required.
     </p>
 
     <section class="panel">
       <div class="grid">
         <div>
-          <label for="receiptInput">Receipt JSON</label>
+          <label for="receiptInput">Signed record JSON</label>
           <textarea id="receiptInput" spellcheck="false"></textarea>
-          <p class="note">Paste a receipt, <code>{"receipt": ...}</code>, a full boundary response, or <code>bundle.receipt</code> from a verification bundle.</p>
+          <p class="note">Paste the retained signed record or a retained response that contains it.</p>
         </div>
         <div>
           <label for="jwksInput">Pinned public JWKS</label>
           <textarea id="jwksInput" spellcheck="false"></textarea>
-          <p class="note">For production receipts, use the retained JWKS. If you start from a verification bundle, provide a JWKS document containing the matching public JWK; the page does not parse the bundle wrapper automatically.</p>
+          <p class="note">Use the public key material retained with this record. The included sample key is test-only.</p>
         </div>
       </div>
       <div class="actions">
@@ -238,33 +235,34 @@
     </section>
 
     <section class="panel">
-      <label>What this page checks</label>
+      <label>Verification boundary</label>
       <p>
-        The verifier selects the public key whose <code>kid</code> matches the receipt,
-        decodes <code>payload_b64</code>, and verifies the Ed25519 signature over those
-        exact bytes. It rejects non-canonical or small-order Ed25519 points, does not
-        reserialize JSON, and does not make network requests.
+        A successful result confirms signature consistency with the supplied public key.
+        It does not independently establish issuer identity, business truth, evidence completeness,
+        physical execution, legal or organisational authority, or independent trusted time.
       </p>
     </section>
   </main>
 
   <script>
     const SAMPLE_RECEIPT = {
+      "_fixture_notice": "Test-only public verification fixture. Not production material.",
       "receipt": {
-        "payload_b64": "eyJib3VuZGFyeV9zbmFwc2hvdCI6eyJkZWNpc2lvbl90eXBlIjoidGhyZXNob2xkX2V4ZWN1dGlvbl9yZXF1ZXN0IiwiZ2F0ZV90eXBlIjoidGhyZXNob2xkX2dhdGUiLCJzeXN0ZW1fc2NvcGUiOiJlcnBfcGF5bWVudF9yZWxlYXNlX3dvcmtmbG93In0sImNvbW1pdG1lbnRfaWQiOiJibmRfc2FtcGxlX29mZmxpbmVfMDAxIiwiaXNzdWVkX2F0IjoiMjAyNi0wNi0xN1QwMDowMDowMFoiLCJub3RlIjoiU2FtcGxlIHJlY2VpcHQgZm9yIHRoZSBvZmZsaW5lIHZlcmlmaWVyIGtpdC4gRG8gbm90IHVzZSB0aGlzIGtleSBmb3IgcHJvZHVjdGlvbiByZWNlaXB0cy4iLCJwcm90b2NvbCI6ImNyYXRvbi5yZWNlaXB0LnByb3RvY29sLnYxIiwicmVxdWVzdF9pZCI6InJlcV9zYW1wbGVfb2ZmbGluZV8wMDEiLCJ2ZXJkaWN0IjoiYWxsb3cifQ==",
-        "signature": "L78Nk6vn7SIVRlgERW2c1sjLYiQ8hkSE6pTlP/VxggkmLfnU6BZKlJIsZl8gjvmSFkb+q1RRHdNHT01VV1esCQ==",
-        "kid": "sample-k1",
+        "payload_b64": "eyJmaXh0dXJlIjoib2ZmbGluZS12ZXJpZmllci1zYW1wbGUiLCJwcm90b2NvbCI6ImNyYXRvbi5yZWNlaXB0LnByb3RvY29sLnYxIn0=",
+        "signature": "Q3bO4RWScYUnw5PUcM2rNfvIPceC0k7+a5lCFZmljHPehESFO1S9R5phjVU+dYRu72KnUH4Q09+b+DKlUlDUCw==",
+        "kid": "fixture-key",
         "sig_alg": "ed25519"
       }
     };
     const SAMPLE_JWKS = {
+      "_fixture_notice": "Test-only public verification key. Not production material.",
       "keys": [{
         "kty": "OKP",
         "crv": "Ed25519",
         "alg": "EdDSA",
         "use": "sig",
-        "kid": "sample-k1",
-        "x": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg"
+        "kid": "fixture-key",
+        "x": "11l5O7wTooGagnx2rbb7qKSa7gB_SfLQmS2ZuCWtLEg"
       }]
     };
 
@@ -424,14 +422,11 @@
           verification_scope: "signature_matches_supplied_key",
           issuer_identity_verified: false,
           trust_anchor: "missing_attestation_legacy_browser_input",
-          trust_boundary: "This two-field browser verifier confirms the receipt signature matches the public key supplied in the JWKS field. Use verify.py with a full verification bundle to verify a root-signed Craton operational-key attestation.",
+          trust_boundary: "Signature consistency is valid for the supplied public key. Issuer identity is not established by this legacy browser input.",
           kid: receipt.kid,
           sig_alg: "ed25519",
           payload_sha256: await sha256Hex(payloadBytes),
           protocol: payload.protocol,
-          commitment_id: payload.commitment_id,
-          request_id: payload.request_id,
-          verdict: payload.verdict,
           signed_payload: payload
         };
         status.innerHTML = "";

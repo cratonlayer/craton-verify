@@ -1,89 +1,72 @@
-# Craton Offline Receipt Verifier
+# CRATON Offline Verifier
 
-- **Status:** public verification kit for `craton.receipt.protocol.v1`
-- **Runtime:** no network calls, no package install, no Craton account required
-- **Use case:** retained verification bundle -> independent local verification
+Standalone offline verifier for retained CRATON signed boundary records.
 
-Craton receipts are designed to remain independently verifiable even if the Craton runtime is unavailable. The default input is a Craton verification bundle: the receipt plus the pinned public key bundle retained with it. The verifier does not call Craton, does not require a network connection, and does not send receipt data anywhere.
+Verification runs locally without a CRATON account, network callback, package installation, or production-service dependency. The verifier is intended to establish:
 
-The verifier implements `craton.receipt.protocol.v1` only. It verifies the Ed25519 receipt signature over the exact decoded `receipt.payload_b64` bytes before it parses or displays the signed payload, then checks any root-signed operational-key attestation carried in a verification bundle against the `issued_at` value claimed inside that verified payload. That claimed `issued_at` is self-reported by the receipt issuer; it is not an external timestamp authority or independent proof of physical signing time.
+- cryptographic integrity;
+- issuer/key binding when applicable retained trust material is present; and
+- validity of the retained public verification material used for the check.
+
+It does not independently establish underlying business truth, completeness of evidence, physical execution, legal or organisational authority, or independent trusted time.
+
+## Verification inputs
+
+The recommended input is the verification bundle retained with the signed boundary record. A legacy two-file mode remains available for a retained record and its pinned public key bundle.
+
+Keep the record and its verification material together. A public key fetched later can show what is published at that later time; it is not evidence of what was retained with the original record.
+
+The public protocol version, signature algorithm, and verification fields present in a retained record are interoperability metadata. They do not describe how CRATON constructs production requests, boundary decisions, acknowledgements, or execution confirmations.
 
 ## Files
 
-- `verify.html` - offline browser verifier with no external dependencies.
-- `verify.py` - command-line verifier using only the Python standard library.
-- `examples/sample_receipt.json` - a signed test receipt for this kit.
-- `keys/public_key.jwks.json` - the public key bundle that verifies the sample receipt.
-- A production verification bundle combines a receipt, its pinned key bundle, protocol metadata, and verifier instructions in one JSON file.
+- `verify.py` — command-line verifier using only the Python standard library.
+- `verify.html` — standalone browser verifier with no external dependencies.
+- `examples/sample_receipt.json` — disclosure-safe signed test fixture.
+- `keys/public_key.jwks.json` — test-only public key material for the fixture.
 
-The included sample receipt and key are test fixtures. For production receipts, replace `keys/public_key.jwks.json` with the pinned public key bundle from:
+The sample files are not production records or production keys.
 
-```text
-https://cratonlayer.com/protocol/v1/jwks.json
-```
+## Command-line usage
 
-Retain the verification bundle for audit records. If you use the legacy two-file mode, retain the receipt and JWKS bundle together. Do not fetch a fresh JWKS later and treat it as proof of what was pinned when the receipt was created.
-
-## Browser Usage
-
-`verify.html` is a two-field browser verifier. It does not automatically parse a single verification bundle JSON file.
-
-1. Open `verify.html` from this folder. It can be opened directly from disk.
-2. Paste a receipt JSON object into the receipt field. You may paste either the receipt itself, `{ "receipt": ... }`, or a full boundary response that contains `receipt`.
-3. Paste the public JWKS key bundle you retained with the receipt.
-4. Select **Verify receipt**.
-
-If you retained a Craton verification bundle, the recommended path is the command-line bundle mode below. To use this browser page manually, paste `bundle.receipt` into the receipt field and a JWKS document containing the matching public JWK into the JWKS field.
-
-The page verifies the Ed25519 signature over the decoded `receipt.payload_b64` bytes. Only after the signature is valid does it parse and display the signed payload.
-
-## Command-Line Usage
-
-Verify a production verification bundle:
+Verify a retained verification bundle:
 
 ```bash
 python verify.py path/to/craton_verification_bundle.json
 ```
 
-Legacy two-file mode is still supported for retained receipt and key files:
+Verify a legacy retained record with its pinned public key bundle:
 
 ```bash
 python verify.py path/to/receipt.json --jwks path/to/pinned-public-key.jwks.json
 ```
 
-Verify the bundled sample fixtures with the legacy two-file mode:
+Verify the included test fixture:
 
 ```bash
 python verify.py examples/sample_receipt.json --jwks keys/public_key.jwks.json
 ```
 
-On success, the script prints a JSON report with `signature_valid`, `issuer_identity_verified`, `trust_anchor`, `attestation_time_basis`, `receipt_claimed_issued_at`, the selected `kid`, a SHA-256 hash of the signed payload bytes, and the decoded signed payload. `verified: true` means both the receipt signature and the Craton root-signed operational-key attestation verified for the receipt's self-reported `issued_at` time. Legacy inputs without attestation can return `signature_valid: true` with `issuer_identity_verified: false`.
+For a current verification bundle, `verified: true` means that both signature integrity and issuer/key binding were established against the applicable retained trust material. A legacy input can return `signature_valid: true` while `issuer_identity_verified` and `verified` remain false. Failed verification exits non-zero.
 
-## Security Notes
+## Browser usage
 
-- The sample receipt and bundled key are fixtures for testing this kit. They are not production keys.
-- Anchored production verification depends on a verification bundle that includes the receipt, the matching public key bundle, and a root-signed operational-key attestation.
-- Legacy receipt/JWKS verification remains supported, but it proves only `signature_valid`, not `issuer_identity_verified`.
-- The verifier rejects unsupported signature algorithms, non-canonical Ed25519 point encodings, small-order Ed25519 points, and payloads that are not `craton.receipt.protocol.v1`.
-- Signature verification is performed before payload parsing. Do not reserialize the payload JSON and verify a transformed representation.
-- This repository intentionally contains no production private keys, API keys, customer data, runtime configuration, or Craton server code.
+Open `verify.html` directly from disk, paste the retained signed record and its pinned public JWKS material, then select **Verify receipt**.
 
-## Repository Scope
+The browser page is deliberately limited to the legacy two-input check. It establishes signature consistency with the supplied public key but does not establish issuer identity. Use the command-line verifier with a current retained verification bundle when issuer/key binding is required.
 
-This repository is intentionally narrow. It contains only the standalone offline verifier, a sample receipt fixture, and a sample public key fixture. It does not contain the Craton runtime, production signing keys, customer configuration, billing logic, or deployment configuration.
+## Public verification resources
 
-## Verification Logic
+- Online verifier: <https://cratonlayer.com/verify>
+- Current public verification keys: <https://cratonlayer.com/protocol/v1/jwks.json>
 
-The verification logic follows `craton.receipt.protocol.v1`:
+These resources support verification. They are not a production integration specification.
 
-1. Extract `receipt.payload_b64`, `receipt.signature`, and `receipt.kid`.
-2. Select the public key in the JWKS whose `kid` matches the receipt.
-3. Decode `receipt.payload_b64` to bytes.
-4. Decode `receipt.signature` and the selected Ed25519 public key.
-5. Verify the signature over the decoded payload bytes exactly.
-6. Parse the signed payload only after the signature is valid.
-7. If an `attestation` object is present, verify it with the pinned Craton root key and confirm it binds the selected operational key.
-8. Check the attestation validity window against the `issued_at` value claimed inside the verified receipt payload. This is a self-reported receipt timestamp, not an external timestamp authority.
-9. Do not reserialize JSON before verifying.
+## Security boundary
 
-This is the basis for no-callback verification: a retained verification bundle, or a retained receipt plus a pinned public key bundle, can be checked offline by auditors, counsel, engineers, or other authorized third parties.
+- Verification performs no network calls and sends no record data anywhere.
+- Signed content is not displayed as trusted until its signature has been checked.
+- Unsupported algorithms and malformed verification material are rejected.
+- The repository contains no signing private keys, customer data, production credentials, runtime configuration, server code, or production integration recipe.
+
+See [SECURITY.md](SECURITY.md) for reporting and trust-boundary details.

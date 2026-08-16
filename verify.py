@@ -349,9 +349,6 @@ def verify_receipt(receipt_document: Any, jwks_document: dict[str, Any] | None =
         "payload_sha256": sha256_hex(payload_bytes),
         "key_source": key_source,
         "protocol": signed_payload.get("protocol"),
-        "commitment_id": signed_payload.get("commitment_id"),
-        "request_id": signed_payload.get("request_id"),
-        "verdict": signed_payload.get("verdict"),
         "signed_payload": signed_payload,
     }
 

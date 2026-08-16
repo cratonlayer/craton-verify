@@ -2,55 +2,49 @@
 
 ## Scope
 
-This repository contains only the standalone offline verifier for `craton.receipt.protocol.v1`.
+This repository contains the standalone offline verifier for retained CRATON signed boundary records.
 
 In scope:
 
-- Verification behavior in `verify.py`
-- Verification behavior in `verify.html`
-- Sample receipt and sample public key fixtures
-- Documentation that affects safe verifier use
+- verification behaviour in `verify.py` and `verify.html`;
+- test-only signed-record and public-key fixtures; and
+- documentation that affects safe verifier use.
 
 Out of scope:
 
-- Craton production runtime services
-- Production signing keys
-- Customer data or customer configuration
-- Billing, activation, deployment, or API-key provisioning flows
+- CRATON production runtime services;
+- signing private keys;
+- customer data or customer configuration;
+- billing, activation, deployment, or credential-provisioning flows; and
+- issuer-side record construction or production integration mechanics.
 
 ## Reporting
 
-Please report suspected verifier security issues privately to the Craton maintainers before public disclosure.
+Please report suspected verifier security issues privately to the CRATON maintainers before public disclosure.
 
 Include:
 
-- The affected file and version or commit SHA
-- A minimal receipt/JWKS example when possible
-- Expected behavior and observed behavior
-- Whether the issue affects false positives, false negatives, or local data handling
+- the affected file and version or commit SHA;
+- a minimal test-only record and public-key example when possible;
+- expected and observed behaviour; and
+- whether the issue affects false positives, false negatives, or local data handling.
 
-## Design Boundary
+## Independent-verification boundary
 
 The verifier must remain independently auditable:
 
-- No network calls during verification
-- No third-party runtime dependencies
-- No production secrets or customer data
-- Signature verification before payload parsing or display
-- Exact-byte verification over decoded `receipt.payload_b64`
+- no network calls during verification;
+- no third-party runtime dependency;
+- no production secrets or customer data;
+- signature validation before signed content is treated as trusted; and
+- no production write, callback, or service dependency.
 
-## Root Trust Anchor
+Current retained verification bundles may include public trust material that binds the signing key to CRATON. The command-line verifier validates that material against its pinned public trust anchor and reports issuer/key binding separately from signature integrity.
 
-Current verification bundles may include an `attestation` object. This attestation is signed by Craton's offline root key and binds an operational receipt-signing key to a specific `kid`, public key fingerprint, allowed use, environment, and validity window.
+Legacy records without applicable retained trust material remain signature-checkable against the supplied public key. That result confirms internal signature consistency only; it does not establish that the supplied key was issued by CRATON.
 
-The command-line verifier pins the Craton root public key fingerprint:
+The public trust material needed for verification is included in the verifier or retained bundle. No private trust-anchor material is stored in this repository or required for verification.
 
-```text
-craton-root-v1 / 43a88132f76a9201b0773f245381329922754eed1a668d386be653b5549cfe80
-```
+## Proof limits
 
-For an anchored verification bundle, the verifier first verifies the receipt signature with the selected operational key. Only after the signed payload is verified does it validate the root-signed operational-key attestation and check that the receipt's self-reported `issued_at` falls inside the attestation validity window. The signed payload makes that claimed `issued_at` tamper-evident, but it is not an external timestamp authority or independent proof of physical signing time. A forged bundle that contains a fake receipt and an attacker-generated public key cannot produce `issuer_identity_verified: true` unless it also contains a valid Craton root-signed attestation for that key.
-
-Legacy receipts or bundles without an attestation are still checked for signature consistency. They return `signature_valid: true` when the receipt signature matches the supplied key, but they return `issuer_identity_verified: false` and `trust_anchor: "missing_attestation_legacy_bundle"`. That legacy result means the receipt and supplied key are internally consistent; it does not prove the key was issued by Craton.
-
-The root private key is not stored in this repository, not used by this verifier, and not required for ordinary receipt verification. It is held offline and used only to sign operational-key attestations.
+A successful result establishes the cryptographic properties stated in the report. It does not independently establish business truth, evidence completeness, physical execution, legal or organisational authority, or independent trusted time.
